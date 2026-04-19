@@ -1,0 +1,2 @@
+checkpoint_path = "saved_model"
+max_seq_length = 128
