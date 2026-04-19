@@ -93,16 +93,14 @@ class IntentClassification:
 
 
 if __name__ == "__main__":
-    # Define the path to your configuration file
     config_path = "configs/inference.yaml"
     
-    # Initialise the classifier (this implicitly calls the __init__ method)
     classifier = IntentClassification(model_path=config_path)
     
     # Define a test message
     test_message = "I am still waiting on my card, when will it arrive?"
     
-    # Predict the label (this implicitly calls the __call__ method)
+    # Predict the label 
     print(f"\nInput Message: '{test_message}'")
     prediction = classifier(test_message)
     print(f"Predicted Label: {prediction}")

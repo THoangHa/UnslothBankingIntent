@@ -3,9 +3,10 @@ import yaml
 import pandas as pd
 import torch
 from datasets import Dataset
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 from transformers import TrainingArguments
 from unsloth import FastLanguageModel
+from tqdm import tqdm
 
 def format_prompts(examples):
     """
@@ -103,14 +104,14 @@ def main():
     
     trainer = SFTTrainer(
         model = model,
-        tokenizer = tokenizer,
+        processing_class = tokenizer,
         train_dataset = train_dataset,
         eval_dataset = test_dataset,
-        dataset_text_field = "text",
-        max_seq_length = config["max_seq_length"],
-        dataset_num_proc = 2,
-        packing = False, 
-        args = TrainingArguments(
+        args = SFTConfig(
+            dataset_text_field = "text",
+            max_seq_length = config["max_seq_length"],
+            dataset_num_proc = 2,
+            packing = False, 
             per_device_train_batch_size = config["training_arguments"]["per_device_train_batch_size"],
             gradient_accumulation_steps = 4,
             warmup_steps = config["training_arguments"]["warmup_steps"],
@@ -125,8 +126,10 @@ def main():
             lr_scheduler_type = config["training_arguments"]["lr_scheduler_type"],
             seed = config["training_arguments"]["seed"],
             output_dir = output_dir,
+            average_tokens_across_devices = False,
         ),
     )
+
 
     print("Commencing fine-tuning")
     trainer_stats = trainer.train()
