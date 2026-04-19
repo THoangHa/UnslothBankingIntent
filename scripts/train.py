@@ -3,9 +3,9 @@ import yaml
 import pandas as pd
 import torch
 from datasets import Dataset
+from unsloth import FastLanguageModel
 from trl import SFTTrainer, SFTConfig
 from transformers import TrainingArguments
-from unsloth import FastLanguageModel
 from tqdm import tqdm
 
 def format_prompts(examples):
@@ -42,7 +42,8 @@ def calculate_accuracy(model, tokenizer, df_test):
             **inputs, 
             max_new_tokens=5, 
             use_cache=True, 
-            pad_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.eos_token_id,
+            max_length=None
         )
         
         decoded_output = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
@@ -74,6 +75,7 @@ def main():
         max_seq_length = config["max_seq_length"],
         dtype = None, 
         load_in_4bit = True, 
+        device_map = {"": 0}
     )
 
     print("Applying LoRA (Parameter-Efficient Fine-Tuning)")
@@ -111,9 +113,9 @@ def main():
             dataset_text_field = "text",
             max_seq_length = config["max_seq_length"],
             dataset_num_proc = 2,
-            packing = False, 
+            packing = True, 
             per_device_train_batch_size = config["training_arguments"]["per_device_train_batch_size"],
-            gradient_accumulation_steps = 4,
+            gradient_accumulation_steps = config["training_arguments"]["gradient_accumulation_steps"],
             warmup_steps = config["training_arguments"]["warmup_steps"],
             num_train_epochs = config["training_arguments"]["num_train_epochs"],
             learning_rate = float(config["training_arguments"]["learning_rate"]),

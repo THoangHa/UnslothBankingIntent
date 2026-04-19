@@ -22,7 +22,6 @@ class IntentClassification:
             load_in_4bit = True,
         )
 
-        # Enable Unsloth's native inference optimisation
         FastLanguageModel.for_inference(self.model)
 
         # Predefine the label mapping to translate the model's output ID back to a string
@@ -60,7 +59,7 @@ class IntentClassification:
         """
         Receives an input message and returns the predicted intent label.
         """
-        # Format the input exactly as it was formatted during training
+        # Format the input 
         prompt = f"Categorise the intent of the following banking query.\n\nQuery: {message}\n\nIntent ID:"
 
         # Tokenise the input string
