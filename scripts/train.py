@@ -1,6 +1,7 @@
 import os
 import yaml
 import pandas as pd
+import torch
 from datasets import Dataset
 from trl import SFTTrainer
 from transformers import TrainingArguments
@@ -65,8 +66,8 @@ def main():
             warmup_steps = config["training_arguments"]["warmup_steps"],
             num_train_epochs = config["training_arguments"]["num_train_epochs"],
             learning_rate = float(config["training_arguments"]["learning_rate"]),
-            fp16 = not FastLanguageModel.is_bfloat16_supported(),
-            bf16 = FastLanguageModel.is_bfloat16_supported(),
+            fp16 = not torch.cuda.is_bf16_supported(),
+            bf16 = torch.cuda.is_bf16_supported(),
             logging_steps = 1,
             optim = config["training_arguments"]["optim"],
             weight_decay = config["training_arguments"]["weight_decay"],
