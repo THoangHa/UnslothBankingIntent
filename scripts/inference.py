@@ -94,6 +94,7 @@ class IntentClassification:
 if __name__ == "__main__":
     config_path = "configs/inference.yaml"
     
+    # Call __init__ method
     classifier = IntentClassification(model_path=config_path)
     
     # Define a test message

@@ -8,60 +8,43 @@ from trl import SFTTrainer, SFTConfig
 from transformers import TrainingArguments
 from tqdm import tqdm
 
-def format_prompts(examples):
-    """
-    Transforms the raw text and labels into an instruction format suitable for causal language models.
-    """
-    instructions = []
-    for text, label in zip(examples['text'], examples['label']):
-        prompt = f"Categorise the intent of the following banking query.\n\nQuery: {text}\n\nIntent ID: {label}"
-        instructions.append(prompt)
-    return {"text": instructions}
-
-def calculate_accuracy(model, tokenizer, df_test):
-    """
-    Runs an inference loop over the test set to calculate exact classification accuracy.
-    """
-    print("\nCalculating final accuracy on the test set")
-    
+def evaluate_model(model, tokenizer, df_test):
+    print("Switching model to inference mode...")
     FastLanguageModel.for_inference(model)
     
-    correct_predictions = 0
+    y_true = []
+    y_pred = []
     total_samples = len(df_test)
     
     for _, row in tqdm(df_test.iterrows(), total=total_samples, desc="Evaluating"):
         text = row['text']
-        true_label = str(row['label'])
+        true_label = int(row['label']) 
         
-        # Format identical to training
-        prompt = f"Categorise the intent of the following banking query.\n\nQuery: {text}\n\nIntent ID:"
-        
+        prompt = f"Categorise the intent of the following banking query.\n\nQuery: {text}\n\nIntent ID: "
         inputs = tokenizer([prompt], return_tensors="pt").to("cuda")
         
+        # Only parse the tokens generated AFTER the prompt
+        input_length = inputs.input_ids.shape[1]
         outputs = model.generate(
             **inputs, 
             max_new_tokens=5, 
             use_cache=True, 
             pad_token_id=tokenizer.eos_token_id,
-            max_length=None
+            max_length = None
         )
         
-        decoded_output = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+        # Extract the numeric prediction
+        prediction_text = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True).strip()
+        numeric_id = ''.join(filter(str.isdigit, prediction_text))
         
-        try:
-            # Extract the predicted number
-            predicted_id_str = decoded_output.split("Intent ID:")[-1].strip()
-            predicted_id = ''.join(filter(str.isdigit, predicted_id_str))
-        except (ValueError, IndexError):
-            predicted_id = "-1"
+        y_true.append(true_label)
+        y_pred.append(int(numeric_id) if numeric_id else -1)
             
-        if predicted_id == true_label:
-            correct_predictions += 1
-            
-    accuracy = (correct_predictions / total_samples) * 100
-    
-    print(f"Final Test Accuracy: {accuracy:.2f}% ({correct_predictions}/{total_samples})")
- 
+    accuracy = accuracy_score(y_true, y_pred)
+    print(f"\nFinal Test Accuracy: {accuracy * 100:.2f}%")
+    print("\nDetailed Classification Report:")
+    print(classification_report(y_true, y_pred, zero_division=0))
+
 
 def main():
     print("Loading hyperparameters from configuration")
@@ -77,6 +60,17 @@ def main():
         load_in_4bit = True, 
         device_map = {"": 0}
     )
+    
+    def format_prompts(examples):
+        """
+        Transforms the raw text and labels into an instruction format suitable for causal language models.
+        """
+        instructions = []
+        for text, label in zip(examples['text'], examples['label']):
+            # Adding the EOS token helps the model learn where to stop
+            prompt = f"Categorise the intent of the following banking query.\n\nQuery: {text}\n\nIntent ID: {label}{tokenizer.eos_token}"
+            instructions.append(prompt)
+        return {"text": instructions}
 
     print("Applying LoRA (Parameter-Efficient Fine-Tuning)")
     model = FastLanguageModel.get_peft_model(
@@ -90,11 +84,11 @@ def main():
     )
 
     print("Loading preprocessed training data")
-    df_train = pd.read_csv("sample_data/train.csv")
+    df_train = pd.read_csv("sample_data/train.csv") # Modify if needed
     train_dataset = Dataset.from_pandas(df_train)
     
     print("Loading test data")
-    df_test = pd.read_csv("sample_data/test.csv")
+    df_test = pd.read_csv("sample_data/test.csv") # Modify if needed
     test_dataset = Dataset.from_pandas(df_test)
     
     # Map the formatting function over the dataset
@@ -111,9 +105,9 @@ def main():
         eval_dataset = test_dataset,
         args = SFTConfig(
             dataset_text_field = "text",
-            max_seq_length = config["max_seq_length"],
+            max_length = config["max_seq_length"],
             dataset_num_proc = 2,
-            packing = True, 
+            packing = False, 
             per_device_train_batch_size = config["training_arguments"]["per_device_train_batch_size"],
             gradient_accumulation_steps = config["training_arguments"]["gradient_accumulation_steps"],
             warmup_steps = config["training_arguments"]["warmup_steps"],
@@ -122,13 +116,13 @@ def main():
             fp16 = not torch.cuda.is_bf16_supported(),
             bf16 = torch.cuda.is_bf16_supported(),
             logging_steps = 1,
-            eval_strategy = "epoch",
             optim = config["training_arguments"]["optim"],
             weight_decay = config["training_arguments"]["weight_decay"],
             lr_scheduler_type = config["training_arguments"]["lr_scheduler_type"],
             seed = config["training_arguments"]["seed"],
-            output_dir = output_dir,
-            average_tokens_across_devices = False,
+            output_dir = config['training_arguments']['output_dir'],
+            eval_strategy = "epoch",
+            save_strategy = "no"
         ),
     )
 
@@ -136,8 +130,6 @@ def main():
     print("Commencing fine-tuning")
     trainer_stats = trainer.train()
     print(f"Training completed in {trainer_stats.metrics['train_runtime']} seconds.")
-    
-    calculate_accuracy(model, tokenizer, df_test)
 
     save_path = config['save_model_path']
     print(f"Saving model checkpoint to {save_path}.")
@@ -145,6 +137,9 @@ def main():
     model.save_pretrained(save_path) 
     tokenizer.save_pretrained(save_path)
     print("Process finished successfully.")
+    
+    print("Evaluate Model")
+    evaluate_model(model, tokenizer, df_test)
 
 if __name__ == "__main__":
     main()
