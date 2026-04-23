@@ -23,17 +23,15 @@ def evaluate_model(model, tokenizer, df_test):
         prompt = f"Categorise the intent of the following banking query.\n\nQuery: {text}\n\nIntent ID: "
         inputs = tokenizer([prompt], return_tensors="pt").to("cuda")
         
-        # Only parse the tokens generated AFTER the prompt
         input_length = inputs.input_ids.shape[1]
         outputs = model.generate(
             **inputs, 
             max_new_tokens=5, 
             use_cache=True, 
             pad_token_id=tokenizer.eos_token_id,
-            max_length = None
+            max_length=None
         )
         
-        # Extract the numeric prediction
         prediction_text = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True).strip()
         numeric_id = ''.join(filter(str.isdigit, prediction_text))
         
@@ -41,9 +39,17 @@ def evaluate_model(model, tokenizer, df_test):
         y_pred.append(int(numeric_id) if numeric_id else -1)
             
     accuracy = accuracy_score(y_true, y_pred)
-    print(f"\nFinal Test Accuracy: {accuracy * 100:.2f}%")
+    macro_f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+    micro_f1 = f1_score(y_true, y_pred, average='micro', zero_division=0)
+    
+    print(f"\nFinal Test Set Results ({total_samples} samples):")
+    print(f"Accuracy:  {accuracy * 100:.2f}%")
+    print(f"Macro F1:  {macro_f1 * 100:.2f}%")
+    print(f"Micro F1:  {micro_f1 * 100:.2f}%")
+    
     print("\nDetailed Classification Report:")
     print(classification_report(y_true, y_pred, zero_division=0))
+
 
 
 def main():
