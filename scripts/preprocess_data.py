@@ -56,7 +56,7 @@ def main():
     # 5. Sample a subset of the cleaned data
     # Taking 10% of the dataset
     # The random_state ensures reproducibility
-    sample_fraction = 0.1 
+    sample_fraction = 0.3 
     
     df_train_sampled = df_train.sample(frac=sample_fraction, random_state=42)
     df_test_sampled = df_test.sample(frac=sample_fraction, random_state=42)
