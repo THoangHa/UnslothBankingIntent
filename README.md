@@ -19,7 +19,7 @@ Kaggle provides free access to NVIDIA T4 and P100 GPUs, which are required for U
 The project is structured following the required format to ensure logical separation of scripts, configurations, and data:
 
 ```text
-banking-intent-unsloth/
+banking-intent-unsloth
 |-- scripts/
 |   |-- train.py
 |   |-- inference.py
